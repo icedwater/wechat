@@ -1,70 +1,85 @@
-# 微信公众号Python-SDK
+# Public WeChat Python-SDK
 
-作者: [@jeff_kit](http://twitter.com/jeff_kit)
+Author: [@jeff_kit](http://twitter.com/jeff_kit)
+Translator: [@icedwater](http://twitter.com/icedwater)
 
-本SDK支持微信公众号以及企业号的上行消息及OAuth接口。本文档及SDK假设使用者已经具备微信公众号开发的基础知识，及有能力通过微信公众号、企业号的文档来查找相关的接口详情。
+This SDK supports WeChat messaging protocols for use with public accounts and
+enterprise accounts. OAuth authentication is supported too. This file and SDK
+assumes that the user already knows the basics of message transmission with a
+WeChat account, and is able to find relevant API documentation for the public
+and enterprise cases.
 
-
-## 1. 安装
+## 1. Installation
 
 ### pip
 	
 	pip install wechat
 
-### 源码安装
+
+### Source Installation
 
 	git clone git@github.com:jeffkit/wechat.git
 	cd wechat
 	python setup.py install
-	
-	
-## 2. 用户上行消息处理框架
 
-对于微信用户在公众号内发送的上行消息，本sdk提供了一个微型处理框架，开发者只需继承wechat.official.WxApplication类, 实现各种消息对应的方法，然后把该类与自己熟悉的web框架结合起来使用即可。
 
-WxApplication内部会实现请求的合法性校验以及消息的分发等功能，还对上行消息对行了结构化，开发者把精力放到业务逻辑的编写即可。
+## 2. Messaging Framework
 
-WxApplication类核心方法：
+This SDK provides a mini-framework for messaging using public accounts, which
+may be found in `wechat.official.WxApplication`. This allows use with the web
+framework that one may prefer.
+
+`WxApplication` takes care of the well-formedness of requests and messages so
+that developers may focus on the business logic.
+
+WxApplication core method:
 
 ### WxApplication.process(params, xml, token=None, app_id=None, aes_key=None)
 
-WxApplication的process函数，接受以下参数：
+`WxApplication.process` accepts the following parameters:
 
-- params, url参数字典，需要解析自微信回调的url的querystring。格式如：{'nonce': 1232, 'signature': 'xsdfsdfsd'}
-- xml, 微信回调时post的xml内容。
-- token, 公众号的上行token，可选，允许在子类配置。
-- app_id, 公众号应用id，可选，允许在子类配置。
-- aes_key, 公众号加密secret，可选，允许在子类配置。
+- `params`: dictionary with the components of the `url` `querystring` from a
+   WeChat response. Example: {'nonce': 1232, 'signature': 'xsdfsdfsd'}
+- `xml`, the XML content returned via POST by WeChat.
+- `token`, a public authentication token (optional).
+- `app_id`, the application ID from a public account (optional).
+- `aes_key`, the `secret` from a public account (optional).
 
-process最后返回一串文本(xml或echoStr)。
+`process` returns a character string, which may be XML or an `echoStr`.
 
 
-#### 使用场景1：上行URL有效性验证
+#### Use Case 1：URL Verification
 
-在微信公众号的后台设置好URL及token等相关信息后，微信会通过GET的方式访问一次该URL，开发者在URL的响应程序里直接调用app.process(params, xml=None)即可返回echStr。
+Once the public WeChat account backend has configured the `URL`, `token`, and
+other information correctly, WeChat will issue a `GET` request for the `URL`.
+Developers may use `app.process(params, xml=None)` to reply with an `echoStr`
+in the callback for this request:
 
 	qs = 'nonce=1221&signature=19selKDJF&timestamp=12312'
 	query = dict([q.split('=') for q in qs.split('&')])
 	app = YourApplication()
 	echo_str = app.process(query, xml=None)
-	# 返回echo_str给微信即可
+	# Send echo_str back to WeChat
 	
 
-#### 使用场景2：处理上行消息
+#### Use Case 2: Handling ?updates
 
-用户在微信公众号上发消息给公众号，微信服务器调用上行的URL，开发者需要对每次的的请求进行合法性校验及对消息进行处理，同样的，直接调用app.process方法就好。
+Users sending a message to a public WeChat account from a public account, the
+Wechat server will use the transmitted URL. Developers must perform checks on
+every request for validity and message-handling, and this can be handled with
+`app.process`:
 
 	qs = 'nonce=1221&signature=19selKDJF&timestamp=12312'
 	query = dict([q.split('=') for q in qs.split('&')])
 	body = '<xml> ..... </xml>'
 	app = YourApplication()
 	result = app.process(query, xml=body)
-	# 返回result给微信即可
+	# Send result back to WeChat
 
 
-### WxApplication子类示例
+### Inheriting from WxApplication
 
-下面先看看一个WxApplication的示例代码，用于把用户上行的文本返还给用户：
+This sample code using `WxApplication` which returns an uploaded text string:
 
 	from wechat.official import WxApplication, WxTextResponse, WxMusic,\
 		WxMusicResponse
@@ -77,52 +92,58 @@ process最后返回一串文本(xml或echoStr)。
 
     	def on_text(self, text):
         	return WxTextResponse(text.Content, text)
-        
-    	
-需要配置几个类参数，几个参数均可在公众号管理后台的开发者相关页面找到，前三个参数如果不配置，则需要在调用process方法时传入。
+
+
+The type and number of required parameters can be found in the WeChat backend
+developers pages. If the first three parameters are not set here, they should
+be passed to the `process` method when calling it.
 	
-- SECRET_TOKEN: 微信公众号回调的TOKEN
-- APP_ID: 微信公众号的应用ID
-- ENCODING_AES_KEY: (可选)，加密用的SECRET，如您的公众号未采取加密传输，不需填。
-- UNSUPPORT_TXT:(可选)，收到某种不支持类型的消息时自动响应给用户的文本消息。
-- WELCOME_TXT:(可选), 新关注时默认响应的文本消息。
+- `SECRET_TOKEN`: Response token for the WeChat public account
+- `APP_ID`: Application ID for a WeChat public account ID
+- `ENCODING_AES_KEY`: (optional) A `SECRET`, not needed if the public account
+   has not added secure transmission.
+- `UNSUPPORT_TXT`: (optional) text response when receiving unsupported data.
+- `WELCOME_TXT`: (optional) default text response for new followers.
 
-然后，您需要逐一实现WxApplication的各个on_xxxx函数。不同类型的上行消息及事件均有对应的on_xxx函数
+Next, the `WxApplication` event handlers `on_xxx` need to be implemented. For
+various types of received messages, there are appropriate `on_xxx` handlers.
 
-### on_xxx函数
+### `on_xxx` handlers
 
 
-所有的on_xxx函数列举如下：
+Here are all the `on_xxx` handlers:
 
-- on_text, 响应用户文本
-- on_link，响应用户上行的链接
-- on_image，响应用户上行图片
-- on_voice，响应用户上行语音
-- on_video，响应用户上行视频
-- on_location，响应用户上行地理位置
-- on_subscribe，响应用户关注事件
-- on_unsubscribe，响应用户取消关注事件
-- on_click，响应用户点击自定义菜单事件
-- on_scan，响应用户扫描二维码事件
-- on_location_update，响应用户地理位置变更事件
-- on_view，响应用户点击自定义菜单访问网页事件
-- on_scancode_push
-- on_scancode_waitmsg
-- on_pic_sysphoto
-- on_pic_photo_or_album
-- on_pic_weixin
-- on_location_select
+- `on_text`: respond to text from the user
+- `on_link`: respond to a link from the user
+- `on_image`: respond to an image uploaded by the user
+- `on_voice`: respond to a recorded audio file from the user
+- `on_video`: respond to an uploaded video from the user
+- `on_location`: respond to an uploaded location from the user
+- `on_subscribe`: respond to a subscribe request
+- `on_unsubscribe`: respond to an unsubscribe request
+- `on_click`: respond to a user click on a menu
+- `on_scan`: respond to a scanned QR code
+- `on_location_update`: respond to a location update event
+- `on_view`: respond to a user click requesting to load a webpage
+- `on_scancode_push`
+- `on_scancode_waitmsg`
+- `on_pic_sysphoto`
+- `on_pic_photo_or_album`
+- `on_pic_weixin`
+- `on_location_select`
 
-on_xxx函数的定义如下：
+`on_xxx` handlers are defined as follows:
 
 	def on_xxx(self, req):
 		return WxResponse()
 
-on_xxx函数，接受一个WxRequest参数req，返回一个WxResponse的子类实例。
+Handlers take a `WxRequest` parameter `req` and return a `WxResponse` object.
 
 #### WxRequest
 
-req是一个代表用户上行消息的WxRequest实例。其属性与消息的XML属性一一对应，不同的消息有几个相同的属性：
+A user request is represented by a `WxRequest` object `req`. `req` properties
+correspond one-to-one with XML properties, the properties below are common to
+all requests:
 
 - ToUserName
 - FromUserName
@@ -130,49 +151,54 @@ req是一个代表用户上行消息的WxRequest实例。其属性与消息的XM
 - MsgType
 - MsgId
 
-不同的消息类型对应有各自的属性，属性名与消息的xml标签名保一致。如MsgType为text的的req，有一个Content属怀，而MsgType为image的req，则有PicUrl及MediaId两个属性。更多消息详情请查看微信公众号[官方文档](http://mp.weixin.qq.com/wiki/10/79502792eef98d6e0c6e1739da387346.html)。
+Depending on the request type, each `req` may have its own set of properties,
+but this will always match those defined in the XML. For example, a `MsgType`
+for a `text` `req` will have a `Content` variable, while with a `image` `req`
+there will be `PicUrl` and `MediaId` instead. For more information, read the
+[official documentation](http://mp.weixin.qq.com/wiki/10/79502792eef98d6e0c6e1739da387346.html).
 
 #### WxResponse
 
-on_xxx函数需要返回一个WxResponse的子类实例。WxResponse的子类及其构造的方式有：
+`on_xxx` handlers must return a `WxResponse` object. This may be one of the following:
 
-##### WxTextResponse, 文本消息
+##### WxTextResponse, text messages
 
  	WxTextResponse("hello", req)
 	
-##### WxImageResponse, 图片消息
+##### WxImageResponse, picture messages
 
 	WxImageResponse(WxImage(MediaId='xxyy'),req)
 	
-##### WxVoiceResponse, 语音消息
+##### WxVoiceResponse, voice messages
 
 	WxVoiceResponse(WxVoice(MediaId='xxyy'),req)
 	
-##### WxVideoResponse, 视频消息
+##### WxVideoResponse, video messages
 
 	WxVideoResponse(WxVideo(MediaId='xxyy', Title='video', Description='test'),req)
 	
-##### WxMusicResponse, 音乐消息
+##### WxMusicResponse, music message
 
 	WxMusicResponse(WxMusic(Title='hey jude', 
 		Description='dont make it bad', 
 		PicUrl='http://heyjude.com/logo.png', 
 		Url='http://heyjude.com/mucis.mp3'), req)
 
-##### WxNewsResponse, 图文消息
+##### WxNewsResponse, (news) article message
 
 	WxNewsResponse(WxArticle(Title='test news', 
 		Description='this is a test', 
 		Picurl='http://smpic.com/pic.jpg', 
 		Url='http://github.com/jeffkit'), req)
-##### WxEmptyResponse, 无响应
+
+##### WxEmptyResponse, empty response
 	
 	WxEmptyResponse(req)
 
-### 在Django中使用WxApplication
 
+### Using WxApplication with Django
 
-下面以Django为例说明，实现一个微信回调的功能(view)，利用上面示例代码中的WxApp：
+This is how to implement a `view` response in Django using the `WxApp` above:
 	
 	from django.http import HttpResponse
 
@@ -181,14 +207,15 @@ on_xxx函数需要返回一个WxResponse的子类实例。WxResponse的子类及
 		result = app.process(request.GET, request.body)
 		return HttpResponse(result)
 
-配置 urls.py:
+and in `urls.py`:
 	
 	urlpatterns = patterns('',
     	url(r'^wechat/', 'myapp.views.wechat'),
 	)
 
 
-### 在Flask中使用WxApplication
+### Using WxApplication with Flask
+
 	from flask import request
 	from flask import Flask
 	app = Flask(__name__)
@@ -199,38 +226,42 @@ on_xxx函数需要返回一个WxResponse的子类实例。WxResponse的子类及
 		return app.process(request.args, request.data)
 
 
-OK.就这么多，WxApplication本身与web框架无关，不管你使用哪个Framework都可以享受到它带来的便利。
+OK. That's it, `WxApplication` itself has no relevance with the web framework
+so you can use whatever you prefer.
 
-### 什么？你不喜欢写WxApplication的子类？！
+### What? You don't like to write WxApplication objects?!
 
-好吧，其实，你可以在任何地方写on_xxx的响应函数。然后在使用之前，告诉一个WxApplication你要用哪个函数来响应对应的事件就好。以Django为例：
+Well, OK, you can write `on_xxx` handlers anywhere, as long as you inform the
+`WxApplication` where the response handler is before it is used. For example,
+in Django:
 
-	# 在任何地方写你自己的消息处理函数。
-	# @any_decorator   # 添加任何装饰器。
+	# Write your handler anywhere, I don't care.
+	# @any_decorator   # add any decorator you want.
 	def my_text_handler(req):
 		return WxTextResponse(req.Content, req)
 	
-	# 在web的程序里这样使用：
+	# In the web application:
 	def wechat_view(request):
-		app = WxApplication()   # 实例化基类就好。
-		app.handlers = {'text': my_text_handler}  # 设置你自己的处理器
+		app = WxApplication()   # 实例化基类就好.
+		app.handlers = {'text': my_text_handler} # your preferred interface
 		result = app.process(request.GET, request.body, 
 			token='xxxx', app_id='xxxx', aes_key='xxxx')
 		return HttpResponse(result)
 	
 		
-嗯，可以自定义消息的handlers，而如果要针对事件自定义handlers的话，要修改app.event_handlers，数据的格式是一样的。具体的消息和事件类型的key，就直接看看源码得了。卡卡。
-	
+Yup, define your own message handlers. If you want your own event handlers, I
+would tell you to edit `app.event_handlers`, use the same data structures. It
+is possible to see the source codes with the correct key. Heh heh.
+
 
 ## 3. OAuth API
 
-OAuth API目前仅支持下列常用接口：
+OAuth API currently only supports the following interfaces:
 
-- 发送消息
-- 用户管理
-- 自定义菜单管理
-- 多媒体上传下载
-- 二维码
+- sending messages
+- account management
+- custom menu administration
+- multimedia transfer
+- QR codes
 
-其他接口拟于未来的版本中支持，同时欢迎大家来增补。
-
+Other interfaces may be supported in future. Feel free to add your own.
